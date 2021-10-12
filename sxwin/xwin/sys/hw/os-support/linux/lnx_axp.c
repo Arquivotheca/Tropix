@@ -1,0 +1,184 @@
+/* $XFree86: xc/programs/Xserver/hw/xfree86/os-support/linux/lnx_axp.c,v 1.7 2006/02/17 18:04:38 dawes Exp $ */
+
+#include <stdio.h>
+#include <X11/X.h>
+#include "os.h"
+#include "xf86.h"
+#include "xf86Priv.h"
+#include "xf86Axp.h"
+#include "lnx.h"
+#include "lnx_axp.h"
+#include <unistd.h>
+
+axpDevice lnxGetAXP(void);
+
+typedef struct 
+ { char* sysName; 
+   char* sysVari; 
+   char* cpu; 
+   axpDevice sys; }
+AXP;
+
+static AXP axpList[] = {
+  { "Tsunami", NULL, NULL, TSUNAMI },
+  { "Eiger", NULL, NULL, TSUNAMI }, 
+  {"Noname", NULL, NULL, LCA },
+  { "AlphaBook1", NULL, NULL, LCA }, 
+  {"EB66", NULL, NULL, LCA}, 
+  {"EB64+",NULL,NULL, APECS}, 
+  {"Noritake",NULL,"EV5",CIA},
+  {"Noritake",NULL,"EV56",CIA},
+  {"Noritake",NULL,NULL,APECS},
+  {"XL",NULL,NULL,APECS},              
+  {"Avanti",NULL,NULL,APECS},
+  {"Mikasa",NULL,"EV5",CIA},
+  {"Mikasa",NULL,"EV56",CIA},
+  {"Mikasa",NULL,NULL,APECS},
+  {"EB164","EB164",NULL,CIA},
+  {"EB164","PC164", NULL,CIA},
+  {"EB164","LX164",NULL, PYXIS},
+  {"EB164","SX164",NULL, PYXIS},
+  {"EB164","RX164",NULL, POLARIS},
+  {"Alcor",NULL,NULL,CIA},
+  {"Takara",NULL,NULL,CIA},
+  {"Sable",NULL, "EV5",T2_GAMMA},
+  {"Sable",NULL,"EV56",T2_GAMMA},
+  {"Sable",NULL,NULL,T2},
+  {"Rawhide",NULL,NULL,MCPCIA},
+  {"Jensen",NULL,NULL,JENSEN},
+  {"Miata",NULL,NULL,PYXIS_CIA},
+  {"Ruffian",NULL,NULL,PYXIS_CIA},
+  {"Nautilus",NULL,NULL,IRONGATE},
+  {NULL,NULL,NULL,NONE}
+};
+
+
+axpDevice
+lnxGetAXP(void)
+{
+  FILE *file;
+  int count = 0;
+  char res[256];
+  char cpu[255];
+  char systype[255];
+  char sysvari[255];
+  if (!(file = fopen("/proc/cpuinfo","r")))
+    return SYS_NONE;
+  do {
+    if (!fgets(res,0xff,file)) return SYS_NONE;
+    switch (count) {
+    case 1:
+      sscanf(res, "cpu model : %s",cpu);
+#ifdef DEBUG
+      ErrorF("CPU %s\n",cpu);
+#endif
+      break;
+    case 5:
+      sscanf(res, "system type : %s",systype);
+#ifdef DEBUG
+      ErrorF("system type : %s\n",systype);
+#endif
+      break;
+    case 6:
+      sscanf(res, "system variation : %s",sysvari);
+#ifdef DEBUG
+      ErrorF("system variation: %s\n",sysvari);
+#endif
+      break;
+    }
+    count++;
+  } while (count < 8);
+  
+  fclose(file);
+  
+  count = 0;
+  
+  do {
+    if (!axpList[count].sysName || !strcmp(axpList[count].sysName,systype)) {
+      if (axpList[count].sysVari && strcmp(axpList[count].sysVari,sysvari)) {
+	count++;
+	continue;
+      };
+      if (axpList[count].cpu && strcmp(axpList[count].cpu,cpu)) {
+	count++;
+	continue;
+      }
+      return axpList[count].sys;
+    } 
+	count++;
+  } while (1);
+}
+
+/*
+ * pciconfig_iobase wrappers and dynamic i/o selection
+ */
+#include <linux/unistd.h>
+#include <asm/pci.h>
+#include <errno.h>
+
+void (*_alpha_outb)(unsigned char, unsigned long) = _outb;
+void (*_alpha_outw)(unsigned short, unsigned long) = _outw;
+void (*_alpha_outl)(unsigned int, unsigned long) = _outl;
+unsigned char (*_alpha_inb)(unsigned long) = _inb;
+unsigned short (*_alpha_inw)(unsigned long) = _inw;
+unsigned int (*_alpha_inl)(unsigned long) = _inl;
+
+static long _alpha_iobase_query(unsigned, int, int, int);
+long (*_iobase)(unsigned, int, int, int) = _alpha_iobase_query;
+
+static long
+_alpha_iobase(unsigned flags, int hose, int bus, int devfn)
+{
+#ifdef __NR_pciconfig_iobase
+  if (bus < 0) {
+    bus = hose;
+    flags |= IOBASE_FROM_HOSE;
+  }
+
+  return syscall(__NR_pciconfig_iobase, flags, bus, devfn);
+#else
+  return -ENOSYS
+#endif
+}
+
+static long
+_alpha_iobase_legacy(unsigned flags, int hose, int bus, int devfn)
+{
+  if (hose > 0) return -ENODEV;
+  if (flags & IOBASE_DENSE_MEM) return _bus_base();
+  if (flags & IOBASE_SPARSE_MEM) return _bus_base_sparse();
+  return 0;
+}
+
+static long 
+_alpha_iobase_query(unsigned flags, int hose, int bus, int devfn)
+{
+  /*
+   * Only use iobase if the syscall is supported *and* it's
+   * a dense io system
+   */
+  if (_alpha_iobase(IOBASE_DENSE_IO, 0, 0, 0) > 0) {
+    /*
+     * The syscall worked and it's a dense io system - take over the
+     * io subsystem
+     */
+    _iobase = _alpha_iobase;
+
+#ifndef INCLUDE_XF86_NO_DOMAIN
+    /* 
+     * Only take over the inx/outx functions if this is a dense I/O
+     * system *and* addressing domains are being used. The dense I/O
+     * routines expect I/O to be mapped (as done in xf86MapDomainIO)
+     */
+    _alpha_outb = _dense_outb;
+    _alpha_outw = _dense_outw;
+    _alpha_outl = _dense_outl;
+    _alpha_inb = _dense_inb;
+    _alpha_inw = _dense_inw;
+    _alpha_inl = _dense_inl;
+#endif /* !INCLUDE_XF86_NO_DOMAIN */
+  } else _iobase = _alpha_iobase_legacy;
+
+  return _iobase(flags, hose, bus, devfn);
+}
+

@@ -1,0 +1,44 @@
+typedef union { long itype; tree ttype; enum tree_code code; } YYSTYPE;
+#define	IDENTIFIER	258
+#define	TYPENAME	259
+#define	SCSPEC	260
+#define	TYPESPEC	261
+#define	TYPE_QUAL	262
+#define	CONSTANT	263
+#define	STRING	264
+#define	ELLIPSIS	265
+#define	SIZEOF	266
+#define	ENUM	267
+#define	STRUCT	268
+#define	UNION	269
+#define	IF	270
+#define	ELSE	271
+#define	WHILE	272
+#define	DO	273
+#define	FOR	274
+#define	SWITCH	275
+#define	CASE	276
+#define	DEFAULT	277
+#define	BREAK	278
+#define	CONTINUE	279
+#define	RETURN	280
+#define	GOTO	281
+#define	ASM	282
+#define	TYPEOF	283
+#define	ALIGNOF	284
+#define	ATTRIBUTE	285
+#define	ASSIGN	286
+#define	OROR	287
+#define	ANDAND	288
+#define	EQCOMPARE	289
+#define	ARITHCOMPARE	290
+#define	LSHIFT	291
+#define	RSHIFT	292
+#define	UNARY	293
+#define	PLUSPLUS	294
+#define	MINUSMINUS	295
+#define	HYPERUNARY	296
+#define	POINTSAT	297
+
+
+extern YYSTYPE yylval;

@@ -1,0 +1,25 @@
+#  Nomes
+ebc32|EBC 32,
+#  Capacidades Booleans 
+	am,
+#  Capacidades Numericas 
+	cols#80, lines#24, 
+#  Capacidades String 
+	bel=^G,
+	cr=\r,
+	clear=\E[2J\E[;H,
+	home=\E[;H,
+	blink=\E[5m,
+	rev=\E[7m,
+	smso=\E[1m,
+	smul=\E[4m,
+	sgr0=\E[m,
+	is1=\E[20;?1;?3;?4;?5;?6;?25l,
+	kcud1=2,
+	kcub1=4,
+	kcuf1=6,
+	kcuu1=8,
+	ind=\ED,
+	ri=\EM,
+#	csr=\E[%p1%{1}%+%d;%p2%{1}%+%dr,
+	cup=\E[%p1%{1}%+%d;%p2%{1}%+%dH,
